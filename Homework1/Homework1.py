@@ -10,11 +10,19 @@ from random import randint
 
 
 def findConnectedComponents(image_name, open_ellipse_size, close_ellipse_size):
-
+    """ Find and display the connected components of an image.
+    
+    Args:
+        image name -- name of image file, must be in same directory as python script
+        open_ellipse_size -- the size of the mask used to perform the open morphology
+        close_ellipse_size -- the size of the mask used to perform the close morphology
+        
+    """
+    
     #get original image and display
     im_orig = cv2.imread(image_name, cv2.IMREAD_COLOR)
     
-    cv2.imshow('Original', im_orig)
+    cv2.imshow(image_name + ": Original", im_orig)
     
     # cv2.waitKey(0)
     
@@ -26,7 +34,7 @@ def findConnectedComponents(image_name, open_ellipse_size, close_ellipse_size):
     #convert image to gray scale type
     im_gray = cv2.cvtColor(im_th, cv2.COLOR_RGB2GRAY)
     
-    cv2.imshow('Threshold', im_gray)
+    cv2.imshow(image_name + ": Threshold", im_gray)
     
     # cv2.waitKey(0)
     
@@ -39,8 +47,8 @@ def findConnectedComponents(image_name, open_ellipse_size, close_ellipse_size):
     kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, close_ellipse_size)
     im_close = cv2.morphologyEx(im_open, cv2.MORPH_CLOSE, kernel_close) 
     
-    cv2.imshow('Kidney Open', im_open)
-    cv2.imshow('Kidney Close', im_close)
+    cv2.imshow(image_name + ": Kidney Open", im_open)
+    cv2.imshow(image_name + ": Kidney Close", im_close)
     
     # cv2.waitKey(0)
     
