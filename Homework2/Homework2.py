@@ -1,6 +1,7 @@
+#!/usr/bin/env python
 '''
+Homework2.py -- HW2 for EE 596, skin pixel finding algorithm using K means and classifiers
 Created on Oct 16, 2015
-
 @author: Keith Mikoleit
 '''
 
@@ -20,6 +21,7 @@ def OpenImage(filepath, RG):
     """
     img = cv2.imread(filepath, cv2.IMREAD_COLOR)
     
+    # convert to RG space by normalizing RGB values
     if RG:
         # reshape image into single vector
         ivec = img.reshape((-1,3))
@@ -60,15 +62,11 @@ def Kmeans(filename, K, RG):
     # read in test image
     img = OpenImage(filename, RG)
     
-    #===========================================================================
-    # cv2.imshow('test image', img)
-    # cv2.waitKey(0)
-    #===========================================================================
-    
     # reshape image into single vector
     ivec = img.reshape((-1,3))
     # convert integer values to float
     fvec = np.float32(ivec)
+    
     # create the criteria for kmeans
     # epsilon is the convergence criteria, amount which the individual parameters change it iteration
     if RG == True:
@@ -82,10 +80,10 @@ def Kmeans(filename, K, RG):
     # number of different K means initial clusters to try
     attempts = 50
     
-    ret,pixels,centers = cv2.kmeans(fvec,K,criteria,attempts, cv2.KMEANS_RANDOM_CENTERS)
+    _,pixels,centers = cv2.kmeans(fvec,K,criteria,attempts, cv2.KMEANS_RANDOM_CENTERS)
     
     #following code is from http://docs.opencv.org/3.0-beta/doc/py_tutorials/py_ml/py_kmeans/py_kmeans_opencv/py_kmeans_opencv.html
-    #convert back into uint8 and make original image
+    # convert back into uint8 and make original image for display
     
     #===========================================================================
     # if RG == False:
@@ -118,7 +116,6 @@ def DefineSkin(pixels, face_mask, K):
     """
     
     from collections import Counter
-    import numpy as np
     import cv2
     
 
@@ -126,16 +123,10 @@ def DefineSkin(pixels, face_mask, K):
     groundtruth = cv2.imread(face_mask, cv2.IMREAD_COLOR )
     groundtruth = cv2.cvtColor(groundtruth, cv2.COLOR_RGB2GRAY)
     gvec = groundtruth.flatten()
-    gvec_counts = Counter(gvec)
 
-    #===========================================================================
-    # cv2.imshow('groundtruth', groundtruth)
-    # cv2.waitKey(0)
-    #===========================================================================
-
+    # scores will hold the total positive matches with groundtruth skin
     scores = [0] * K
     skin = 255
-    notskin = 0
 
     pvec = pixels.flatten()
     # loop through each pixel in the label image
@@ -157,8 +148,9 @@ def DefineSkin(pixels, face_mask, K):
         else:
             scores[idx] = 0
     
+    # display processed labels
     #===========================================================================
-    # # display processed labels
+    # import numpy as np
     # tempscores = np.uint8(scores)
     # res = tempscores[pvec]
     # res2 = res.reshape((groundtruth.shape)) 
@@ -204,7 +196,7 @@ def gatherimages(directory_and_type):
     
     """
     images = []
-    for (i,image_file) in enumerate(glob.iglob(directory_and_type)):
+    for (_,image_file) in enumerate(glob.iglob(directory_and_type)):
         images.append(image_file)
     return images
 
@@ -220,7 +212,7 @@ if __name__ == '__main__':
     RG = True
     
     # use Bayes or Forest
-    Bayes = False
+    Bayes = True
     
     # average jaccard score
     jaccaordscore = []
@@ -231,10 +223,6 @@ if __name__ == '__main__':
     
     # get training ground truth image files
     traininggroundtruths = gatherimages('./face_training_groundtruth/*.png')
-    #===========================================================================
-    # for (i,image_file) in enumerate(glob.iglob('./face_training_groundtruth/*.png')):
-    #     groundtruths.append(image_file)
-    #===========================================================================
     # get training images
     trainingimages = gatherimages('./face_training/*.png')
     
@@ -251,13 +239,6 @@ if __name__ == '__main__':
     
     # run k means and get training data for classifier based on comparison with groundtruth
     for (i,image_file) in enumerate(trainingimages):
-        #=======================================================================
-        # Test for directory loop
-        # print image_file
-        # img = cv2.imread(image_file)
-        # cv2.imshow('test image', img)
-        # cv2.waitKey(0)
-        #=======================================================================
         (pixels,centers,_) = Kmeans(image_file, K, RG)
         (_,skin) = DefineSkin(pixels, traininggroundtruths[i], K)
         # append labels and centers to data structure to prepare for classifier training
@@ -265,12 +246,12 @@ if __name__ == '__main__':
             samples.append(centers[i])
             labels.append(skin[i])
     
-    # convert for use with cv2 functions
+    # convert to numpy array for use with cv2 functions
     samples = np.array(samples, np.float32)
     labels = np.array(labels, np.float32)
     
+    # generate model with training data
     if Bayes:
-        # generate model with training data
         model = cv2.NormalBayesClassifier()
         model.train(samples, labels)
     else:
@@ -278,29 +259,17 @@ if __name__ == '__main__':
         rtree_params = dict(max_depth=8, min_sample_count=8, use_surrogates=False, max_categories=5, calc_var_importance=False, nactive_vars=0, max_num_of_trees_in_the_forest=1000, termcrit_type=cv2.TERM_CRITERIA_MAX_ITER, term_crit=(cv2.TERM_CRITERIA_MAX_ITER,100,1))
         forest.train(samples, cv2.CV_ROW_SAMPLE, labels, params=rtree_params)
     
-    #training data arrays
-    testsamples = []
-    testlabels = []
+    # note that there must be a matching groundtruth for each test image
+    # with the same numerical suffix
     
     # get the groundtruths for the testing images
     testgroundtruths = gatherimages('./face_testing_groundtruth/*.png')
-    #===========================================================================
-    # for (i,image_file) in enumerate(glob.iglob('./face_testing_groundtruth/*.png')):
-    #     testgroundtruths.append(image_file)
-    #===========================================================================
-        # print image_file
-        #=======================================================================
-        # img = cv2.imread(image_file)
-        # cv2.imshow('test image', img)
-        # cv2.waitKey(0)
-        #=======================================================================
     # get test images
     testimages = gatherimages('./face_testing/*.png')
     
     # run test images through model and check performance 
     # with the jaccard similarity measure
     for (imgidx,image_file) in enumerate(testimages):
-        print "test image: %s" %image_file
         # run test image through kmeans to get K clusters
         (pixels,centers,img) = Kmeans(image_file, K, RG)
         
@@ -309,8 +278,7 @@ if __name__ == '__main__':
         
         # run test image through model
         if Bayes:
-            # Bayes model can take all of the centers as
-            # an array
+            # Bayes model can take all of the centers as an array
             _, p = model.predict(centers)
         else:
             # the tree model takes each center individually
@@ -340,14 +308,12 @@ if __name__ == '__main__':
         #=======================================================================
         
         # open up groundtruth for testing image and convert to grey scale
-        print testgroundtruths[imgidx]
         groundtruth = cv2.imread(testgroundtruths[imgidx], cv2.IMREAD_COLOR )
         groundtruth = cv2.cvtColor(groundtruth, cv2.COLOR_RGB2GRAY)
         
         #=======================================================================
         # cv2.imshow('truth skin image', groundtruth)
         #=======================================================================
-
         
         # get jaccard score by comparing truth with model result
         greycenter = np.uint8(greycenter)
@@ -360,27 +326,7 @@ if __name__ == '__main__':
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
         #=======================================================================
-        
-    #===========================================================================
-    #     # append labels and centers to data structure to prepare for classifier training
-    #     for i in range(len(centers)):
-    #         testsamples.append(centers[i])
-    #         testlabels.append(p[i])
-    # 
-    #===========================================================================
     
-#===============================================================================
-#     Test code for single image
-#     # run k means on each image to retrieve the labels and centers
-#     test_image = './face_training/face3.png'
-#     K = 8
-#     (pixels,centers) = Kmeans(test_image, K)
-# 
-#     # compare against the training ground truth images to decide if it is skin or not
-#     face_mask = './face_training_groundtruth/facemask3.png'
-#     (_,skin) = DefineSkin(pixels, face_mask, K)
-#     print skin
-#===============================================================================
     average = sum(jaccaordscore)/len(jaccaordscore)
     print ("Average Jaccard Score: %s") %average
     print 'Done'
